@@ -409,8 +409,8 @@ class StatusThread(QObject):
                 self.signals.refreshGraphs.emit(vals, self._count)
             self._count += 1
             self._ave_count += 1
-            if self._count > int(self.num_points*3/4):
-                self._count = int(self.num_points*3/4)
+            if self._count > int(self.num_points):
+                self._count = int(self.num_points)
             if self._ave_count > self.averaging_size-1:
                 self._ave_count = 0
         time.sleep(1 / self.refresh_rate)

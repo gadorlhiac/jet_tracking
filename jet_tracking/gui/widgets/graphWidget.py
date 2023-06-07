@@ -20,11 +20,11 @@ class GraphsWidget(QFrame, GraphsUi):
         self.display_time = self.context.display_time
         self.refresh_rate = self.context.refresh_rate
         self.num_points = self.display_time * self.refresh_rate
-        self.x_axis = list(np.linspace(0, self.display_time, self.num_points))
-        self.y_diff = deque([np.nan for _ in range(self.num_points)], self.num_points)
-        self.y_i0 = deque([np.nan for _ in range(self.num_points)], self.num_points)
-        self.y_ratio = deque([np.nan for _ in range(self.num_points)], self.num_points)
-        self.y_ave = deque([np.nan for _ in range(self.num_points)], self.num_points)
+        self.x_axis = list(np.linspace(-self.display_time, 0, self.num_points))
+        self.y_diff = deque([np.nan for _ in range(self.num_points)])#, self.num_points)
+        self.y_i0 = deque([np.nan for _ in range(self.num_points)])#, self.num_points)
+        self.y_ratio = deque([np.nan for _ in range(self.num_points)])#, self.num_points)
+        self.y_ave = deque([np.nan for _ in range(self.num_points)])#, self.num_points)
         self.old_vals_diff = deque([], 2000)
         self.old_vals_i0 = deque([], 2000)
         self.old_vals_ratio = deque([], 2000)
@@ -103,29 +103,29 @@ class GraphsWidget(QFrame, GraphsUi):
             [self.calibration_values['ratio']['mean']] * length)
         self.plot_calibration()
 
-    def plot_data(self, buf, count):
-        if count == int(self.num_points*3/4):
-            self.y_diff[count] = buf['diff']
-            self.old_vals_diff.append(self.y_diff.popleft())
-            self.y_diff.append(np.nan)
-            self.y_i0[count] = buf['i0']
-            self.old_vals_i0.append(self.y_i0.popleft())
-            self.y_i0.append(np.nan)
-            self.y_ratio[count] = buf['ratio'][-2]
-            self.old_vals_ratio.append(self.y_ratio.popleft())
-            self.y_ratio.append(np.nan)
-            #self.y_ave[count] = buf['ratio'][-1]
-            #self.old_ave.append(self.y_ave.popleft())
-            #self.y_ave.append(np.nan)
-        else:
-            self.y_diff[count] = buf['diff']
-            self.y_i0[count] = buf['i0']
-            self.y_ratio[count] = buf['ratio'][-2]
-            #self.y_ave[count] = buf['ratio'][-1]
+    def plot_data(self, buf: dict, count: int):
+        """! Manage data deques for plot displays.
+
+        @param buf (dict) Dictionary of types of data to display.
+        @param count (int) Count of data points.
+        """
+        old_diff = self.y_diff.popleft()
+        old_i0 = self.y_i0.popleft()
+        old_ratio = self.y_ratio.popleft()
+
+        if count == int(self.num_points):
+            self.old_vals_diff.append(old_diff)
+            self.old_vals_i0.append(old_i0)
+            self.old_vals_ratio.append(old_ratio)
+
+        self.y_diff.append(buf['diff'])
+        self.y_i0.append(buf['i0'])
+        self.y_ratio.append(buf['ratio'][-2])
+
         self.line_diff.setData(self.x_axis, list(self.y_diff))
         self.line_i0.setData(self.x_axis, list(self.y_i0))
         self.line_ratio.setData(self.x_axis, list(self.y_ratio))
-        #self.line_ave.setData(self.x_axis, list(self.y_ave))
+
 
     def plot_calibration(self):
         self.line_diff_low.setData(self.x_axis, self.diff_low_range)
@@ -138,58 +138,54 @@ class GraphsWidget(QFrame, GraphsUi):
         self.line_ratio_high.setData(self.x_axis, self.ratio_high_range)
         self.line_ratio_mean.setData(self.x_axis, self.ratio_mean)
 
-    def set_display_time(self, t, rr):
+    def set_display_time(self, t: int, rr: int):
+        """! Update display ranges for main window plots.
+
+        Based on user input for the number of seconds to display
+        and the data refresh rate, change the data points shown in
+        the plots of the main window.
+
+        @param t (int) Number of seconds of data to show.
+        @param rr (int) New refresh rate.
+        """
         old_num_points = self.num_points
         new_display_time = int(t)
         new_rr = int(rr)
         new_num_points = int(new_display_time * new_rr)
-        n_nan_new = int(new_num_points * 1/4)
-        if old_num_points < new_num_points:
-            new_points_diff = list(self.y_diff)[:int(new_num_points * 3/4)+1] + \
-                                 [np.nan for _ in range(n_nan_new)]
-            new_points_i0 = list(self.y_i0)[:int(new_num_points * 3/4)+1] + \
-                               [np.nan for _ in range(n_nan_new)]
-            new_points_ratio = list(self.y_ratio)[:int(new_num_points * 3/4)+1] + \
-                                  [np.nan for _ in range(n_nan_new)]
-            n = new_num_points - len(new_points_diff)
-            if len(self.old_vals_diff) >= n:
-                for i in range(n):
-                    new_points_diff.insert(0, self.old_vals_diff.pop())
-                    new_points_i0.insert(0, self.old_vals_i0.pop())
-                    new_points_ratio.insert(0, self.old_vals_ratio.pop())
+
+        y_diff: deque = deque([])
+        y_i0: deque = deque([])
+        y_ratio: deque = deque([])
+
+        y_diff.extend(self.y_diff)
+        y_i0.extend(self.y_i0)
+        y_ratio.extend(self.y_ratio)
+
+        time_diff: int = new_display_time - self.display_time
+        rate_diff: int = new_rr - self.refresh_rate
+        pts_diff: int = np.abs(new_num_points - self.num_points)
+
+        if not rate_diff:
+            if time_diff > 0:
+                while pts_diff > 0 and len(self.old_vals_diff) > 0:
+                    y_diff.appendleft(self.old_vals_diff.pop())
+                    y_i0.appendleft(self.old_vals_i0.pop())
+                    y_ratio.appendleft(self.old_vals_ratio.pop())
+                    pts_diff -= 1
+
+                remaining_pts: int = new_num_points - len(y_diff)
+                y_diff.extendleft([np.nan for _ in range(remaining_pts)])
+                y_i0.extendleft([np.nan for _ in range(remaining_pts)])
+                y_ratio.extendleft([np.nan for _ in range(remaining_pts)])
+
             else:
-                front_nan = n - len(self.old_vals_diff)
-                for i in range(front_nan):
-                    new_points_diff.insert(0, np.nan)
-                    new_points_i0.insert(0, np.nan)
-                    new_points_ratio.insert(0, np.nan)
-                for i in range(n - front_nan):
-                    new_points_diff.insert(0, self.old_vals_diff.pop())
-                    new_points_i0.insert(0, self.old_vals_i0.pop())
-                    new_points_ratio.insert(0, self.old_vals_ratio.pop())
-        else:
-            n = old_num_points - \
-                (int(old_num_points*1/4) - int(new_num_points*1/4))
-            points_diff = list(self.y_diff)[-n:]
-            points_i0 = list(self.y_i0)[-n:]
-            points_ratio = list(self.y_ratio)[-n:]
-            new_points_diff = points_diff[:new_num_points+1]
-            new_points_i0 = points_i0[:new_num_points+1]
-            new_points_ratio = points_ratio[:new_num_points+1]
-            for i in range(len(self.y_diff) - len(points_diff)):
-                self.old_vals_diff.append(self.y_diff.popleft())
-                self.old_vals_i0.append(self.y_i0.popleft())
-                self.old_vals_ratio.append(self.y_ratio.popleft())
-        if len(new_points_diff) < new_num_points:
-            d = new_num_points - len(new_points_diff)
-            new_points_diff = new_points_diff + [np.nan for _ in range(d)]
-            new_points_i0 = new_points_i0 + [np.nan for _ in range(d)]
-            new_points_ratio = new_points_ratio + [np.nan for _ in range(d)]
-        y_diff = deque(new_points_diff[-new_num_points:], new_num_points)
-        y_i0 = deque(new_points_i0[-new_num_points:], new_num_points)
-        y_ratio = deque(new_points_ratio[-new_num_points:], new_num_points)
-        idx = np.where(np.isnan(list(self.y_diff)))[0][0]
-        self.signals.setNewXAxis.emit(idx)
+                while pts_diff > 0:
+                    self.old_vals_diff.append(y_diff.popleft())
+                    self.old_vals_i0.append(y_i0.popleft())
+                    self.old_vals_ratio.append(y_ratio.popleft())
+                    pts_diff -= 1
+
+        self.signals.setNewXAxis.emit(0)
         self.y_diff = y_diff
         self.y_i0 = y_i0
         self.y_ratio = y_ratio
@@ -198,6 +194,6 @@ class GraphsWidget(QFrame, GraphsUi):
         self.display_time = self.context.display_time
         self.refresh_rate = self.context.refresh_rate
         self.num_points = self.display_time * self.refresh_rate
-        self.x_axis = list(np.linspace(0, self.display_time, self.num_points))
+        self.x_axis = list(np.linspace(-self.display_time, 0, self.num_points))
         if self.calibrated:
             self.calibrate()
