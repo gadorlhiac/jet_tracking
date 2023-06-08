@@ -1148,12 +1148,12 @@ class JetImageFeed(QObject):
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
                                                (self.close, self.close))
             im = cv2.morphologyEx(im, cv2.MORPH_CLOSE, kernel)
-        if self.contrast:
-            pass
-        if self.brightness:
-            pass
         if self.blur:
             im = cv2.GaussianBlur(im, (3, 3), self.blur, self.blur)
+        if self.contrast:
+            im = cv2.convertScaleAbs(im, alpha=self.contrast/10)
+        if self.brightness:
+            im = cv2.convertScaleAbs(im, beta=self.brightness)
         ret, im = cv2.threshold(im, self.left_threshold, self.right_threshold,
                                 cv2.THRESH_BINARY)
         return im

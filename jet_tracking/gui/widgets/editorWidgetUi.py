@@ -77,9 +77,13 @@ class Editor_Ui(object):
 
         obj.lbl_brightness = QLabel("Brightness")
         obj.slider_brightness = QSlider(Qt.Horizontal)
+        obj.slider_brightness.setMinimum(0)
+        obj.slider_brightness.setMaximum(99)
 
         obj.lbl_contrast = QLabel("Contrast")
         obj.slider_contrast = QSlider(Qt.Horizontal)
+        obj.slider_contrast.setMinimum(1)
+        obj.slider_contrast.setMaximum(20)
 
         obj.lbl_blur = QLabel("Blur")
         obj.slider_blur = QSlider(Qt.Horizontal)

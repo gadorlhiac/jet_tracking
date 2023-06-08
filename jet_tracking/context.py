@@ -565,3 +565,10 @@ class Context(object):
         """
         self.find_com_bool = o
         self.signals.comDetection.emit()
+        
+        if not o:
+            self.contours = []
+            self.best_fit_line = []
+            self.best_fit_line_plus = []
+            self.best_fit_line_minus = []
+            self.com = []
