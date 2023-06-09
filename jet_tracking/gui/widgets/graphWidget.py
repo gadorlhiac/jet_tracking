@@ -199,6 +199,9 @@ class GraphsWidget(QFrame, GraphsUi):
             y_diff.extend([np.nan for _ in pts_range])
             y_i0.extend([np.nan for _ in pts_range])
             y_ratio.extend([np.nan for _ in pts_range])
+            self.old_vals_diff = deque([], 2000)
+            self.old_vals_i0 = deque([], 2000)
+            self.old_vals_ratio = deque([], 2000)
 
 
         self.signals.setNewXAxis.emit(0)
