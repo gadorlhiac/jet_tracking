@@ -21,10 +21,10 @@ class GraphsWidget(QFrame, GraphsUi):
         self.refresh_rate = self.context.refresh_rate
         self.num_points = self.display_time * self.refresh_rate
         self.x_axis = list(np.linspace(-self.display_time, 0, self.num_points))
-        self.y_diff = deque([np.nan for _ in range(self.num_points)])#, self.num_points)
-        self.y_i0 = deque([np.nan for _ in range(self.num_points)])#, self.num_points)
-        self.y_ratio = deque([np.nan for _ in range(self.num_points)])#, self.num_points)
-        self.y_ave = deque([np.nan for _ in range(self.num_points)])#, self.num_points)
+        self.y_diff = deque([np.nan for _ in range(self.num_points)])
+        self.y_i0 = deque([np.nan for _ in range(self.num_points)])
+        self.y_ratio = deque([np.nan for _ in range(self.num_points)])
+        self.y_ave = deque([np.nan for _ in range(self.num_points)])
         self.old_vals_diff = deque([], 2000)
         self.old_vals_i0 = deque([], 2000)
         self.old_vals_ratio = deque([], 2000)
@@ -104,10 +104,13 @@ class GraphsWidget(QFrame, GraphsUi):
         self.plot_calibration()
 
     def plot_data(self, buf: dict, count: int):
-        """! Manage data deques for plot displays.
+        """
+        Manage data deques for plot displays.
 
-        @param buf (dict) Dictionary of types of data to display.
-        @param count (int) Count of data points.
+        Parameters:
+        ----------
+        buf : (dict) Dictionary of types of data to display.
+        count : (int) Count of data points.
         """
         old_diff = self.y_diff.popleft()
         old_i0 = self.y_i0.popleft()
@@ -139,14 +142,17 @@ class GraphsWidget(QFrame, GraphsUi):
         self.line_ratio_mean.setData(self.x_axis, self.ratio_mean)
 
     def set_display_time(self, t: int, rr: int):
-        """! Update display ranges for main window plots.
+        """
+        Update display ranges for main window plots.
 
         Based on user input for the number of seconds to display
         and the data refresh rate, change the data points shown in
         the plots of the main window.
 
-        @param t (int) Number of seconds of data to show.
-        @param rr (int) New refresh rate.
+        Parameters:
+        ----------
+        t : (int) Number of seconds of data to show.
+        rr : (int) New refresh rate.
         """
         old_num_points = self.num_points
         new_display_time = int(t)
@@ -157,16 +163,18 @@ class GraphsWidget(QFrame, GraphsUi):
         y_i0: deque = deque([])
         y_ratio: deque = deque([])
 
-        y_diff.extend(self.y_diff)
-        y_i0.extend(self.y_i0)
-        y_ratio.extend(self.y_ratio)
-
         time_diff: int = new_display_time - self.display_time
         rate_diff: int = new_rr - self.refresh_rate
         pts_diff: int = np.abs(new_num_points - self.num_points)
 
         if not rate_diff:
+            # Refresh rate the same -> start from existing data points
+            y_diff.extend(self.y_diff)
+            y_i0.extend(self.y_i0)
+            y_ratio.extend(self.y_ratio)
+
             if time_diff > 0:
+                # Append data points from the "old pts" deque if too short
                 while pts_diff > 0 and len(self.old_vals_diff) > 0:
                     y_diff.appendleft(self.old_vals_diff.pop())
                     y_i0.appendleft(self.old_vals_i0.pop())
@@ -179,11 +187,19 @@ class GraphsWidget(QFrame, GraphsUi):
                 y_ratio.extendleft([np.nan for _ in range(remaining_pts)])
 
             else:
+                # Cache points in the "old pts" deque if too long
                 while pts_diff > 0:
                     self.old_vals_diff.append(y_diff.popleft())
                     self.old_vals_i0.append(y_i0.popleft())
                     self.old_vals_ratio.append(y_ratio.popleft())
                     pts_diff -= 1
+        else:
+            # Refresh rate changed -> create "empty" deque of nan
+            pts_range: range = range(new_num_points)
+            y_diff.extend([np.nan for _ in pts_range])
+            y_i0.extend([np.nan for _ in pts_range])
+            y_ratio.extend([np.nan for _ in pts_range])
+
 
         self.signals.setNewXAxis.emit(0)
         self.y_diff = y_diff
